@@ -1,17 +1,18 @@
-var exec = require('child_process').exec;
+var execFile = require('child_process').execFile;
 var aspect = require('aspectratio');
 var dirname = require('path').dirname;
 var basename = require('path').basename;
 var extname = require('path').extname;
 var join = require('path').join;
 var sprintf = require('util').format;
+var flatten = require('array-flatten').flatten;
 
 module.exports = function(image, output, cb) {
   if(/;|&|`|\$|\(|\)|\|\||\||!|>|<|\?|\${/g.test(JSON.stringify(image))) {
     console.log('Input Validation failed, Suspicious Characters found');
   } else {
   var cmd = module.exports.cmd(image, output);
-  exec(cmd, {timeout: 30000}, function(e, stdout, stderr) {
+  execFile('convert', flatten(cmd), {timeout: 30000}, function(e, stdout, stderr) {
     if (e) { return cb(e); }
     if (stderr) { return cb(new Error(stderr)); }
 
@@ -110,11 +111,7 @@ module.exports.path = function(src, opts) {
  * @return string convert command
  */
 module.exports.cmd = function(image, output) {
-  var cmd = [
-    sprintf(
-      'convert %s -auto-orient -strip -write mpr:%s +delete', image.path, image.path
-    )
-  ];
+  var cmd = [image.path, '-auto-orient', '-strip', '-write', `mpr:${image.path}`, '+delete'];
 
   for (var i = 0; i < output.versions.length; i++) {
     var version = output.versions[i];
@@ -132,7 +129,7 @@ module.exports.cmd = function(image, output) {
     cmd.push(module.exports.cmdVersion(image, version, last));
   }
 
-  return cmd.join(' ');
+  return flatten(cmd);
 };
 
 /**
@@ -148,42 +145,42 @@ module.exports.cmdVersion = function(image, version, last) {
   var cmd = [];
 
   // http://www.imagemagick.org/Usage/files/#mpr
-  cmd.push(sprintf('mpr:%s', image.path));
+  cmd.push(`mpr:${image.path}`);
 
   // -quality
   if (version.quality) {
-    cmd.push(sprintf('-quality %d', version.quality));
+    cmd.push(['-quality', version.quality]);
   }
 
   // -background
   if (version.background) {
-    cmd.push(sprintf('-background "%s"', version.background));
+    cmd.push(['-background', version.background]);
   }
 
   // -flatten
   if (version.flatten) {
-    cmd.push('-flatten');
+    cmd.push(['-flatten']);
   }
 
   // -crop
   var crop = module.exports.crop(image, version.aspect);
   if (crop.geometry) {
-    cmd.push(sprintf('-crop "%s"', crop.geometry));
+    cmd.push(['-crop', crop.geometry]);
   }
 
   // -resize
   // http://www.imagemagick.org/script/command-line-processing.php#geometry
   var resize = module.exports.resize(crop, version);
   if (resize) {
-    cmd.push(sprintf('-resize "%s"', resize));
+    cmd.push(['-resize', resize]);
   }
 
   // -write
   if (last) {
-    cmd.push(version.path);
+    cmd.push([version.path]);
   } else {
-    cmd.push(sprintf('-write %s +delete', version.path));
+    cmd.push(['-write', version.path, '+delete']);
   }
 
-  return cmd.join(' ');
+  return cmd;
 };

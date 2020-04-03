@@ -31,6 +31,7 @@
     "mocha": "~3.0.0"
   },
   "dependencies": {
+    "array-flatten": "^3.0.0",
     "aspectratio": "~2.2"
   },
   "engines": {
